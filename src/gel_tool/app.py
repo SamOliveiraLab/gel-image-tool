@@ -46,13 +46,14 @@ MODES = [MODE_GREEN, MODE_BOOSTED, MODE_RESIDUAL]
 def _ndarray_to_qpixmap(img: np.ndarray) -> QPixmap:
     """Convert a numpy image (grayscale or BGR) to QPixmap."""
     if img.ndim == 2:
+        img = np.ascontiguousarray(img)
         h, w = img.shape
         qimg = QImage(img.data, w, h, w, QImage.Format.Format_Grayscale8)
     else:
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        rgb = np.ascontiguousarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         h, w, ch = rgb.shape
         qimg = QImage(rgb.data, w, h, w * ch, QImage.Format.Format_RGB888)
-    return QPixmap.fromImage(qimg)
+    return QPixmap.fromImage(qimg.copy())
 
 
 class ImageViewer(QScrollArea):
@@ -111,18 +112,21 @@ class MainWindow(QMainWindow):
 
         # --- Left: controls ---
         ctrl_panel = QWidget()
-        ctrl_panel.setFixedWidth(280)
+        ctrl_panel.setFixedWidth(300)
         ctrl_layout = QVBoxLayout(ctrl_panel)
+        ctrl_layout.setContentsMargins(12, 12, 12, 12)
+        ctrl_layout.setSpacing(12)
         ctrl_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         load_btn = QPushButton("Load Image...")
-        load_btn.setMinimumHeight(40)
+        load_btn.setMinimumHeight(44)
         load_btn.clicked.connect(self._on_load)
         ctrl_layout.addWidget(load_btn)
 
         # Preview of raw image
         raw_group = QGroupBox("Raw Preview")
         raw_layout = QVBoxLayout(raw_group)
+        raw_layout.setContentsMargins(8, 16, 8, 8)
         self._raw_thumb = QLabel("No image loaded")
         self._raw_thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._raw_thumb.setMinimumHeight(160)
@@ -133,6 +137,8 @@ class MainWindow(QMainWindow):
         # Output mode selector
         mode_group = QGroupBox("Output Mode")
         mode_layout = QVBoxLayout(mode_group)
+        mode_layout.setContentsMargins(8, 16, 8, 8)
+        mode_layout.setSpacing(8)
         self._mode_combo = QComboBox()
         self._mode_combo.addItems(MODES)
         self._mode_combo.currentTextChanged.connect(self._on_mode_changed)
@@ -142,6 +148,8 @@ class MainWindow(QMainWindow):
         # Gain slider (for band boost)
         gain_group = QGroupBox("Band Boost Gain")
         gain_layout = QVBoxLayout(gain_group)
+        gain_layout.setContentsMargins(8, 16, 8, 8)
+        gain_layout.setSpacing(8)
         self._gain_label = QLabel(f"Gain: {self._gain:.1f}")
         gain_layout.addWidget(self._gain_label)
         self._gain_slider = QSlider(Qt.Orientation.Horizontal)
@@ -154,7 +162,7 @@ class MainWindow(QMainWindow):
 
         # Export
         export_btn = QPushButton("Export Current View...")
-        export_btn.setMinimumHeight(36)
+        export_btn.setMinimumHeight(40)
         export_btn.clicked.connect(self._on_export)
         ctrl_layout.addWidget(export_btn)
 
