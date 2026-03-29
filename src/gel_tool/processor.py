@@ -30,11 +30,50 @@ class GelResult:
         self.gain = gain
 
 
+def _crop_bright_region(raw_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Fallback crop for non-orange-tray images (e.g. green fluorescence on UV box).
+
+    Finds the bright region via thresholding on the green channel and crops to it.
+    """
+    green_full = raw_bgr[:, :, 1]
+    h, w = green_full.shape
+
+    thresh = np.percentile(green_full, 70)
+    bright = (green_full > thresh).astype(np.uint8) * 255
+
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (30, 30))
+    bright = cv2.morphologyEx(bright, cv2.MORPH_CLOSE, k)
+    bright = cv2.morphologyEx(bright, cv2.MORPH_OPEN, k)
+
+    contours, _ = cv2.findContours(bright, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return raw_bgr, green_full
+
+    bx, by, bw, bh = cv2.boundingRect(max(contours, key=cv2.contourArea))
+
+    pad_x = int(bw * 0.03)
+    pad_y = int(bh * 0.03)
+    x1 = max(0, bx - pad_x)
+    y1 = max(0, by - pad_y)
+    x2 = min(w, bx + bw + pad_x)
+    y2 = min(h, by + bh + pad_y)
+
+    crop_bgr = raw_bgr[y1:y2, x1:x2]
+    green = crop_bgr[:, :, 1]
+    return crop_bgr, green
+
+
 def _auto_crop_gel(raw_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Detect the orange gel tray and crop tightly around the gel region.
+    """Detect the gel region and crop to it.
+
+    Tries orange-tray detection first. Falls back to bright-region detection
+    for green fluorescence / UV transilluminator images.
 
     Returns (crop_bgr, green_channel).
     """
+    h_img, w_img = raw_bgr.shape[:2]
+    img_area = h_img * w_img
+
     hsv = cv2.cvtColor(raw_bgr, cv2.COLOR_BGR2HSV)
     orange_mask = cv2.inRange(hsv, (5, 30, 60), (35, 255, 255))
     k_morph = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 40))
@@ -44,10 +83,18 @@ def _auto_crop_gel(raw_bgr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     contours, _ = cv2.findContours(
         orange_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
-    if not contours:
-        return raw_bgr, raw_bgr[:, :, 1]
 
-    bx, by, bw, bh = cv2.boundingRect(max(contours, key=cv2.contourArea))
+    # Only trust orange detection if the largest contour covers >10% of the image
+    orange_ok = False
+    if contours:
+        largest = max(contours, key=cv2.contourArea)
+        if cv2.contourArea(largest) > img_area * 0.10:
+            orange_ok = True
+
+    if not orange_ok:
+        return _crop_bright_region(raw_bgr)
+
+    bx, by, bw, bh = cv2.boundingRect(largest)
 
     mx, my = int(bw * 0.04), int(bh * 0.04)
     cx0, cy0 = bx + mx, by + my
