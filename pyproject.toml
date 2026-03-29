@@ -12,6 +12,9 @@ dependencies = [
     "numpy>=1.26",
 ]
 
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+
 [project.gui-scripts]
 gel-tool = "gel_tool.app:main"
 
