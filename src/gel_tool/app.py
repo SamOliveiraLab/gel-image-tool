@@ -122,6 +122,7 @@ class MainWindow(QMainWindow):
         load_btn.setMinimumHeight(44)
         load_btn.clicked.connect(self._on_load)
         ctrl_layout.addWidget(load_btn)
+        ctrl_layout.addSpacing(8)
 
         # Preview of raw image
         raw_group = QGroupBox("Raw Preview")
@@ -133,6 +134,7 @@ class MainWindow(QMainWindow):
         self._raw_thumb.setStyleSheet("background: #1a1a1a; color: #888;")
         raw_layout.addWidget(self._raw_thumb)
         ctrl_layout.addWidget(raw_group)
+        ctrl_layout.addSpacing(8)
 
         # Output mode selector
         mode_group = QGroupBox("Output Mode")
